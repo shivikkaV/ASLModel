@@ -5,7 +5,6 @@ import tensorflow as tf
 import tensorflow.keras as keras
 import numpy as np
 from numpy import asarray
-import time
 
 #Importing the model
 model = tf.keras.models.load_model("D:\Models\ASL.keras")
@@ -42,7 +41,11 @@ CATEGORIES = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "
   
 def open_camera(): 
     global frame
-    _, frame = vid.read() 
+    ret, frame = vid.read() 
+    if not ret:
+        print("Failed to grab frame")
+        return
+    
     new_size = (800, 1100)
     opencv_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGBA) # Convert image from one color space to other 
     captured_image = Image.fromarray(opencv_image)     # Capture the latest frame and transform to image 
@@ -50,22 +53,27 @@ def open_camera():
     label_widget.photo_image = photo_image     # Displaying photoimage in the label 
     label_widget.configure(image=photo_image)     # Configure image in the label 
     label_widget.after(10, open_camera)     # Repeat the same process after every 10 seconds 
-    prediction(captured_image) 
+    prediction(frame) 
   
 def prediction(captured_image):
-    p = model.predict(prepare(captured_image))
-    print(CATEGORIES[int(p[0][0])]) #
+    try:
+        processed_image = prepare(captured_image)
+        p = model.predict(processed_image)
+        predicted_class = np.argmax(p[0])
+        print(CATEGORIES[predicted_class]) 
+    except Exception as e:
+        print(f"Prediction error: {e}")
         
 def prepare(captured_image):
     IMG_SIZE = 180
-    image = asarray(captured_image)
-    #img_array = cv2.imshow('', image)#error
-    new_array = cv2.resize(image, (IMG_SIZE, IMG_SIZE))
-    np_array = np.asarray(new_array)
-    np_final = np.expand_dims(np_array,axis=0)
-    return np.resize(np_final, (1, 180, 180, 3))
-    #return np_final.reshape(-3, IMG_SIZE, IMG_SIZE, 3) #error - the array keeps doubling the square of the image size, thus not allowing reshape property
-        
+    try: 
+        new_array = cv2.resize(captured_image, (IMG_SIZE, IMG_SIZE))
+        new_array = new_array / 255.0
+        return np.expand_dims(new_array, axis=0)
+    
+    except Exception as e:
+        print(f"Image preparation error: {e}")
+        return None
   
 # Create a button to open the camera in GUI app 
 button1 = Button(app, text="Open Camera", command=open_camera) 
